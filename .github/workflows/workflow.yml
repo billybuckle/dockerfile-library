@@ -1,57 +1,43 @@
-name: Dockerfile-Library-Deploy
+name: Build and Push Docker Images
 
 on:
-  push:
-    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Choose what image to build.
+        type: choice
+        options:
+          - aws
+          - build/runner
 
 jobs:
-  Identify_Dockerfiles_to_Build:
+  build_and_push:
     runs-on: ubuntu-latest
-    outputs:
-      changed_dirs: ${{ steps.get_changed_dirs.outputs.changed_dirs }}
+    environment: dev
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 2
-    - name: Identify Dockerfile Directories with Changes
-      id: get_changed_dirs
+    - name: Parse Image Tag
+      id: parse_tag
       run: |
-        CHANGED_DIRS=()
-        while IFS= read -r line; do
-          DIR=$(dirname "$line")
-          if ! [[ "${CHANGED_DIRS[@]}" =~ "${DIR}" ]]; then
-            ls -l
-            CHANGED_DIRS+=("${DIR}")
-          fi
-        done <<< "$(git diff --name-only HEAD^ HEAD)"
-        echo "::set-output name=changed_dirs::${CHANGED_DIRS[*]}"
-    
-  Docker_Build_and_Push:
-    needs: Identify_Dockerfiles_to_Build
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 2
-    -
-      name: Login to Docker Hub
-      uses: docker/login-action@v2
+        image_dir=$(echo "${{ github.event.inputs.image }}" | cut -d'/' -f1)
+        image=$(echo "${{ github.event.inputs.image }}" | cut -d'/' -f2)
+        echo "Image Directory: ${image_dir}"
+        echo "Image Name: ${image}"
+        echo "IMAGE_DIR=${image_dir}" >> $GITHUB_ENV
+        echo "IMAGE=${image}" >> $GITHUB_ENV
+
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Authenticate to DockerHub
+      uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_PASSWORD }}
-    - name: Build & Push Images
-      env:
-          DOCKER_REGISTRY: willahern
-          IMAGE_TAG: ${{ github.sha }}
-      run: |
-        DEPLOYABLE_DIRS=("aws")
-        IFS=' ' read -r -a CHANGED_DIRS <<< "${{ needs.Identify_Dockerfiles_to_Build.outputs.changed_dirs }}"
-        for item in "${DEPLOYABLE_DIRS[@]}"; do
-          if [[ " ${CHANGED_DIRS[@]} " =~ " ${item} " ]]; then
-            docker build -t ${DOCKER_REGISTRY}/${item}:${IMAGE_TAG} -t ${DOCKER_REGISTRY}/${item}:latest ./${item}/
-            docker push ${DOCKER_REGISTRY}/${item}:$IMAGE_TAG
-            docker push ${DOCKER_REGISTRY}/${item}:latest
-          fi
-        done
+        password: ${{ secrets.DOCKERHUB_PAT }}
+
+    - name: Build and Push Image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: ${{ github.event.inputs.image }}.Dockerfile
+        push: false
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_DIR }}/${{ env.IMAGE }}:${{ github.sha }}
