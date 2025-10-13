@@ -7,7 +7,7 @@ on:
         description: Choose what image to build.
         type: choice
         options:
-          - aws
+          - build/dev-kit
           - build/runner
       build_only:
         description: Build the image but do not push to DockerHub.

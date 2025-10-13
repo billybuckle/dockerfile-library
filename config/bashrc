@@ -1,0 +1,29 @@
+# Aliases
+## Git
+alias gs='git status'
+alias ga='git add'
+alias gc='git commit'
+alias gca='git commit --amend'
+alias gp='git push'
+alias gl='git log'
+alias gco='git checkout'
+alias gb='git branch'
+alias gd='git diff'
+alias gpl='git pull'
+alias gcl='git clone'
+alias gsta='git stash'
+alias grb='git rebase'
+
+## UV
+alias uva='uv --active'
+
+# Enable bash completion
+if [ -f /usr/share/bash-completion/bash_completion ]; then
+    . /usr/share/bash-completion/bash_completion
+elif [ -f /etc/bash_completion ]; then
+    . /etc/bash_completion
+fi
+source /etc/profile.d/bash_completion.sh
+
+# Set up fzf key bindings and fuzzy completion
+eval "$(fzf --bash)"
